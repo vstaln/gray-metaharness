@@ -103,8 +103,14 @@ fn prepare_home(
     std::fs::create_dir_all(&meta)?;
     let live = meta.join("live.py");
     let _ = std::fs::remove_file(&live);
+    #[cfg(unix)]
     std::os::unix::fs::symlink(policy, &live)
         .with_context(|| format!("cannot symlink {}", live.display()))?;
+    // Windows symlinks need privileges the process may not hold — a copy is
+    // just as live: eval turns read it once per run.
+    #[cfg(not(unix))]
+    std::fs::copy(policy, &live)
+        .with_context(|| format!("cannot write {}", live.display()))?;
 
     // Dedicated workdir: bounds project discovery and gives check.sh a cwd.
     let work = eval_home.join("work");
@@ -128,6 +134,28 @@ fn prepare_home(
         ),
     )?;
     Ok(work)
+}
+
+/// `sh` resolvable on PATH: always true on unix; elsewhere only when a
+/// POSIX shell is installed (Git Bash carries sh.exe on Windows).
+fn sh_on_path() -> bool {
+    #[cfg(unix)]
+    {
+        true
+    }
+    #[cfg(not(unix))]
+    {
+        let Some(paths) = std::env::var_os("PATH") else {
+            return false;
+        };
+        let pathext = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+        std::env::split_paths(&paths).any(|d| {
+            d.join("sh").is_file()
+                || pathext
+                    .split(';')
+                    .any(|e| !e.trim().is_empty() && d.join(format!("sh{}", e.trim())).is_file())
+        })
+    }
 }
 
 /// Env shared by setup.sh / check.sh: where the home, trace, and answer live.
@@ -224,6 +252,13 @@ pub async fn eval_candidate(
     cand: &Candidate,
     on_task: impl Fn(&str, f64),
 ) -> Result<Value> {
+    // Task fixtures/scorers are POSIX shell scripts and the eval sidecar is
+    // launched through a `#!/bin/sh` wrapper: without sh on PATH (e.g. Git
+    // Bash's on Windows) there is no honest way to run the inner loop.
+    anyhow::ensure!(
+        sh_on_path(),
+        "metaharness evals need a POSIX shell — no `sh` found on PATH"
+    );
     let tasks_dir = domain.tasks_path(meta);
     let tasks = discover(&tasks_dir);
     if tasks.is_empty() {
