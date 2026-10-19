@@ -55,6 +55,8 @@ pub fn init() -> Result<String> {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
         }
+        #[cfg(not(unix))]
+        let _ = mode_700;
         made.push(path.display().to_string());
         Ok(())
     };
@@ -336,6 +338,12 @@ pub fn spawn_detached(verb: &str, args: &[String]) -> Result<String> {
             libc::setpgid(0, 0);
             Ok(())
         });
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP.
+        cmd.creation_flags(0x0000_0008 | 0x0000_0200);
     }
     let child = cmd.spawn().context("spawn detached")?;
     Ok(format!(
