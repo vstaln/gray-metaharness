@@ -49,6 +49,7 @@ fn manifest() -> Value {
             "parameters": {"type": "object", "properties": {}}
         }],
         "commands": ["/metaharness"],
+        "command_descriptions": {"/metaharness": "search for a better context-injection policy"},
         "hooks": ["prompt/context"],
         "subcommands": ["metaharness"],
     })
