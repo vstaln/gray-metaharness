@@ -16,7 +16,7 @@ const SEED_POLICY: &str = include_str!("../seed/policy.py");
 /// `--iterations N` parsing shared by `run` and the wire path.
 pub fn parse_iterations(args: &[String]) -> Result<u32> {
     let mut it = args.iter();
-    while let Some(a) = it.next() {
+    if let Some(a) = it.next() {
         match a.as_str() {
             "--iterations" | "-n" => {
                 let v = it.next().context("--iterations needs a value")?;
@@ -156,15 +156,14 @@ pub fn apply(id: &str) -> Result<String> {
     let meta = paths::meta_dir(&home);
     let id = paths::resolve_id(&meta, id)?;
     store::apply(&meta, &id)?;
-    Ok(format!("candidate {id} is now live ({})", paths::live_path(&meta).display()))
+    Ok(format!(
+        "candidate {id} is now live ({})",
+        paths::live_path(&meta).display()
+    ))
 }
 
 /// Score every unscored candidate; returns how many were evaluated.
-async fn score_unscored(
-    meta: &Path,
-    home: &Path,
-    domain: &Domain,
-) -> Result<u32> {
+async fn score_unscored(meta: &Path, home: &Path, domain: &Domain) -> Result<u32> {
     let pending = store::unscored(meta);
     let mut n = 0;
     for cand in pending {
@@ -262,12 +261,7 @@ impl Drop for LockGuard {
 /// per iteration: proposer → score the new candidate. Faithful to the
 /// paper where it matters: artifacts on the filesystem, proposer outside
 /// the scoring path, one evaluated candidate per iteration.
-async fn run_loop(
-    meta: &Path,
-    home: &Path,
-    domain: &Domain,
-    iterations: u32,
-) -> Result<String> {
+async fn run_loop(meta: &Path, home: &Path, domain: &Domain, iterations: u32) -> Result<String> {
     let start = Instant::now();
     let budget = Duration::from_secs(domain.budget_secs);
     let mut log = String::new();
@@ -286,14 +280,25 @@ async fn run_loop(
         let next = store::next_id(meta);
         let prompt = propose::render(meta, &next, i + 1);
         eprintln!("proposing candidate {next} (iteration {})...", i + 1);
-        match propose::propose(domain, meta, home, &prompt, &format!("iter{:03}.log", i + 1)).await {
+        match propose::propose(
+            domain,
+            meta,
+            home,
+            &prompt,
+            &format!("iter{:03}.log", i + 1),
+        )
+        .await
+        {
             Ok(_) => {
                 let pol = paths::candidate_dir(meta, &next).join("policy.py");
                 if pol.is_file() {
                     eprintln!("  proposer wrote {}", pol.display());
                 } else {
                     eprintln!("  proposer did not write {next}/policy.py — nothing to score");
-                    log.push_str(&format!("iteration {}: proposer produced no policy.py\n", i + 1));
+                    log.push_str(&format!(
+                        "iteration {}: proposer produced no policy.py\n",
+                        i + 1
+                    ));
                     continue;
                 }
             }

@@ -17,7 +17,8 @@ pub const TEMPLATE: &str = include_str!("../proposer_prompt.md");
 
 /// User-editable copy wins; embedded template is the default.
 pub fn template(meta: &Path) -> String {
-    std::fs::read_to_string(meta.join("proposer_prompt.md")).unwrap_or_else(|_| TEMPLATE.to_string())
+    std::fs::read_to_string(meta.join("proposer_prompt.md"))
+        .unwrap_or_else(|_| TEMPLATE.to_string())
 }
 
 /// Render the proposer prompt for one iteration.
@@ -32,7 +33,13 @@ pub fn render(meta: &Path, next_id: &str, iteration: u32) -> String {
 
 /// Spawn the proposer session. Blocks until it exits or hits the timeout.
 /// Returns Ok(true) when the new policy file exists afterwards.
-pub async fn propose(domain: &Domain, meta: &Path, main_home: &Path, prompt: &str, log_name: &str) -> Result<bool> {
+pub async fn propose(
+    domain: &Domain,
+    meta: &Path,
+    main_home: &Path,
+    prompt: &str,
+    log_name: &str,
+) -> Result<bool> {
     let mut cmd = tokio::process::Command::new(&domain.gray_bin);
     cmd.arg("-p")
         .arg(prompt)
