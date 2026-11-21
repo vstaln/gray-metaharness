@@ -23,22 +23,14 @@ use std::time::Duration;
 pub fn run(policy: &Path, payload: &Value, timeout: Duration) -> Result<Value> {
     let mut cmd = Command::new("python3");
     cmd.arg(policy);
-    let out = crate::proc::run(
-        cmd,
-        Some(payload.to_string().into_bytes()),
-        timeout,
-    )
-    .context("spawn python3")?;
+    let out = crate::proc::run(cmd, Some(payload.to_string().into_bytes()), timeout)
+        .context("spawn python3")?;
     if out.timed_out {
         bail!("policy timed out after {}s", timeout.as_secs());
     }
     let text = out.stdout_text();
-    let v: Value = serde_json::from_str(text.trim()).with_context(|| {
-        format!(
-            "policy stdout is not a JSON object: {:.200}",
-            text.trim()
-        )
-    })?;
+    let v: Value = serde_json::from_str(text.trim())
+        .with_context(|| format!("policy stdout is not a JSON object: {:.200}", text.trim()))?;
     if !v.is_object() {
         bail!("policy stdout must be a JSON object");
     }
@@ -124,7 +116,10 @@ pub fn render_inject(v: &Value) -> String {
     };
     let mut out = String::new();
     for item in items {
-        let title = item.get("title").and_then(Value::as_str).unwrap_or("context");
+        let title = item
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or("context");
         let text = item.get("text").and_then(Value::as_str).unwrap_or("");
         if text.trim().is_empty() {
             continue;
@@ -144,8 +139,8 @@ pub fn render_inject(v: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use std::io::Write;
+    use std::path::PathBuf;
 
     fn write_policy(dir: &Path, body: &str) -> PathBuf {
         let p = dir.join("policy.py");

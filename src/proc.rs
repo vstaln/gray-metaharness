@@ -8,6 +8,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+#[allow(dead_code)]
 pub struct ProcOut {
     pub code: Option<i32>,
     pub stdout: Vec<u8>,
@@ -15,6 +16,7 @@ pub struct ProcOut {
     pub timed_out: bool,
 }
 
+#[allow(dead_code)]
 impl ProcOut {
     pub fn ok(&self) -> bool {
         !self.timed_out && self.code == Some(0)
