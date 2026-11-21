@@ -104,8 +104,9 @@ fn prepare_home(
     #[cfg(unix)]
     std::os::unix::fs::symlink(policy, &live)
         .with_context(|| format!("cannot symlink {}", live.display()))?;
-    // Windows symlinks need privileges the process may not hold — a copy is
-    // just as live: eval turns read it once per run.
+    // Windows symlinks need a privilege the process may not hold; the copy
+    // is the fallback so an unprivileged host still scores, and eval turns
+    // read it once per run.
     #[cfg(windows)]
     if std::os::windows::fs::symlink_file(policy, &live).is_err() {
         std::fs::copy(policy, &live).with_context(|| format!("cannot write {}", live.display()))?;
