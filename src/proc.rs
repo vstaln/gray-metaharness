@@ -8,11 +8,13 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+#[allow(dead_code)]
 pub struct ProcOut {
     pub stdout: Vec<u8>,
     pub timed_out: bool,
 }
 
+#[allow(dead_code)]
 impl ProcOut {
     pub fn stdout_text(&self) -> String {
         String::from_utf8_lossy(&self.stdout).into_owned()
