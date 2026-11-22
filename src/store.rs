@@ -29,7 +29,7 @@ impl Candidate {
             .filter(|s| !s.is_empty())
     }
     pub fn score(&self) -> Option<Value> {
-        std::fs::read(&self.score_path())
+        std::fs::read(self.score_path())
             .ok()
             .and_then(|b| serde_json::from_slice(&b).ok())
     }
@@ -70,12 +70,7 @@ pub fn next_id(meta: &Path) -> String {
     let max = std::fs::read_dir(crate::paths::candidates_dir(meta))
         .map(|it| {
             it.flatten()
-                .filter_map(|e| {
-                    e.file_name()
-                        .to_string_lossy()
-                        .parse::<u32>()
-                        .ok()
-                })
+                .filter_map(|e| e.file_name().to_string_lossy().parse::<u32>().ok())
                 .max()
                 .unwrap_or(0)
         })
@@ -94,10 +89,7 @@ pub fn record_score(meta: &Path, cand: &Candidate, rec: &Value) -> Result<()> {
     std::fs::create_dir_all(&cand.dir)?;
     let mut v = rec.clone();
     v["candidate"] = json!(cand.id);
-    std::fs::write(
-        cand.score_path(),
-        serde_json::to_string_pretty(&v)?,
-    )?;
+    std::fs::write(cand.score_path(), serde_json::to_string_pretty(&v)?)?;
     let mut row = json!({
         "candidate": cand.id,
         "score": v["score"],
@@ -187,16 +179,13 @@ pub fn status_text(meta: &Path) -> String {
         .and_then(|v| v["candidate"].as_str().map(str::to_string));
     let mut out = String::from("candidate  score   marks    hypothesis\n");
     for c in &cands {
-        let score = c
-            .score_f64()
-            .map(|s| format!("{s:.3}"))
-            .unwrap_or_else(|| {
-                if c.score().is_some() {
-                    "err".to_string()
-                } else {
-                    "—".to_string()
-                }
-            });
+        let score = c.score_f64().map(|s| format!("{s:.3}")).unwrap_or_else(|| {
+            if c.score().is_some() {
+                "err".to_string()
+            } else {
+                "—".to_string()
+            }
+        });
         let mut marks = String::new();
         if live.as_deref() == Some(c.id.as_str()) {
             marks.push_str("LIVE ");
@@ -208,7 +197,9 @@ pub fn status_text(meta: &Path) -> String {
         let hyp_short: String = hyp.chars().take(52).collect();
         out.push_str(&format!(
             "{:<10} {:<7} {:<8} {hyp_short}\n",
-            c.id, score, marks.trim_end()
+            c.id,
+            score,
+            marks.trim_end()
         ));
     }
     out

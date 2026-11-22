@@ -9,21 +9,13 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 pub struct ProcOut {
-    pub code: Option<i32>,
     pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
     pub timed_out: bool,
 }
 
 impl ProcOut {
-    pub fn ok(&self) -> bool {
-        !self.timed_out && self.code == Some(0)
-    }
     pub fn stdout_text(&self) -> String {
         String::from_utf8_lossy(&self.stdout).into_owned()
-    }
-    pub fn stderr_text(&self) -> String {
-        String::from_utf8_lossy(&self.stderr).into_owned()
     }
 }
 
@@ -59,26 +51,21 @@ pub fn run(mut cmd: Command, stdin: Option<Vec<u8>>, timeout: Duration) -> io::R
 
     let start = Instant::now();
     let mut timed_out = false;
-    let code = loop {
+    loop {
         match child.try_wait()? {
-            Some(st) => break st.code(),
+            Some(_) => break,
             None => {
                 if start.elapsed() > timeout {
                     timed_out = true;
                     let _ = child.kill();
                     let _ = child.wait();
-                    break None;
+                    break;
                 }
                 thread::sleep(Duration::from_millis(15));
             }
         }
-    };
+    }
     let stdout = out_h.join().unwrap_or_default();
-    let stderr = err_h.join().unwrap_or_default();
-    Ok(ProcOut {
-        code,
-        stdout,
-        stderr,
-        timed_out,
-    })
+    let _ = err_h.join();
+    Ok(ProcOut { stdout, timed_out })
 }
