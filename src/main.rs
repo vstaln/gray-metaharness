@@ -18,7 +18,7 @@
 use std::io::{BufRead, Write};
 use std::time::Duration;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 mod cli;
 mod domain;
@@ -120,7 +120,11 @@ fn sidecar() {
                 let argv: Vec<String> = params
                     .get("argv")
                     .and_then(Value::as_array)
-                    .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
                     .unwrap_or_default();
                 match cli::wire_command(&argv) {
                     Ok(v) => json!({ "id": id, "result": v }),

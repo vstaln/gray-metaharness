@@ -79,10 +79,7 @@ impl Domain {
     pub fn load(meta: &Path) -> Result<Self> {
         let path = meta.join("domain.toml");
         let text = std::fs::read_to_string(&path).with_context(|| {
-            format!(
-                "no {} — run `gray metaharness init` first",
-                path.display()
-            )
+            format!("no {} — run `gray metaharness init` first", path.display())
         })?;
         toml::from_str(&text).with_context(|| format!("bad {}", path.display()))
     }

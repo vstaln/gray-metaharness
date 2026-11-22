@@ -81,11 +81,9 @@ fn prepare_home(
     // runs. Strip the plugin identity (and pin the eval endpoint/model
     // when configured); api_key + base_url then drive a plain HTTP turn.
     let cfg_path = eval_home.join("config.json");
-    if let Ok(mut cfg) =
-        serde_json::from_str::<serde_json::Map<String, Value>>(
-            &std::fs::read_to_string(&cfg_path).unwrap_or_default(),
-        )
-    {
+    if let Ok(mut cfg) = serde_json::from_str::<serde_json::Map<String, Value>>(
+        &std::fs::read_to_string(&cfg_path).unwrap_or_default(),
+    ) {
         for k in ["provider_id", "credential_source", "auth_ref"] {
             cfg.remove(k);
         }
@@ -108,9 +106,12 @@ fn prepare_home(
         .with_context(|| format!("cannot symlink {}", live.display()))?;
     // Windows symlinks need privileges the process may not hold — a copy is
     // just as live: eval turns read it once per run.
-    #[cfg(not(unix))]
-    std::fs::copy(policy, &live)
-        .with_context(|| format!("cannot write {}", live.display()))?;
+    #[cfg(windows)]
+    if std::os::windows::fs::symlink_file(policy, &live).is_err() {
+        std::fs::copy(policy, &live).with_context(|| format!("cannot write {}", live.display()))?;
+    }
+    #[cfg(not(any(unix, windows)))]
+    std::fs::copy(policy, &live).with_context(|| format!("cannot write {}", live.display()))?;
 
     // Dedicated workdir: bounds project discovery and gives check.sh a cwd.
     let work = eval_home.join("work");
@@ -120,7 +121,10 @@ fn prepare_home(
     // Launcher script forwards args so the host can probe `manifest` and
     // then spawn `sidecar` (same launcher pattern as the channel adapters).
     let launcher = eval_home.join("metaharness-sidecar");
-    std::fs::write(&launcher, format!("#!/bin/sh\nexec {} \"$@\"\n", exe.display()))?;
+    std::fs::write(
+        &launcher,
+        format!("#!/bin/sh\nexec {} \"$@\"\n", exe.display()),
+    )?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -310,7 +314,13 @@ pub async fn eval_candidate(
                         let answer = extract_answer(&raw);
                         std::fs::write(&answer_file, &answer)?;
                         let (score, check_out) = score_task(
-                            task, domain, &eval_home, cand, &work, &answer_file, &trace_file,
+                            task,
+                            domain,
+                            &eval_home,
+                            cand,
+                            &work,
+                            &answer_file,
+                            &trace_file,
                         );
                         std::fs::write(
                             trace_dir.join(format!("{}.check.txt", task.name)),
@@ -335,11 +345,7 @@ pub async fn eval_candidate(
     }
 
     let n = per_task.len().max(1) as f64;
-    let mean = per_task
-        .values()
-        .filter_map(Value::as_f64)
-        .sum::<f64>()
-        / n;
+    let mean = per_task.values().filter_map(Value::as_f64).sum::<f64>() / n;
     Ok(json!({
         "score": (mean * 1000.0).round() / 1000.0,
         "tasks": Value::Object(per_task),
